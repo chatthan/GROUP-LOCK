@@ -145,7 +145,13 @@ export function parseDeviceIntent(rawText, contacts = []) {
 
   // ── Navigation ─────────────────────────────────────────────────────────
   m = t.match(/^(?:please\s+)?(?:navigate|directions?|route|take me|drive me|guide me)\s+(?:to\s+)?(.+)$/);
-  if (m && !/\b(destination|there)\b$/.test(m[1])) return { type: 'navigate', place: m[1].trim() };
+  if (
+    m &&
+    !/\b(destination|there)\b$/.test(m[1]) &&
+    !/\b(petrol|fuel|pump|pumb|bunk|gas station|hospital|junction|hazard|pothole|mechanic)\b/i.test(m[1])
+  ) {
+    return { type: 'navigate', place: m[1].trim() };
+  }
 
   // ── Media ──────────────────────────────────────────────────────────────
   m = t.match(/^(?:play|search)\s+(.+?)\s+on\s+youtube$/) || t.match(/^youtube\s+(?:search\s+)?(.+)$/);

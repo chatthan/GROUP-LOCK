@@ -76,6 +76,84 @@ async function getRoute(from, to) {
   };
 }
 
+// ── Upcoming Junction / Turn Detection ──────────────────────────────────────
+async function getUpcomingJunction(from, to) {
+  if (!from || typeof from.lat !== 'number' || typeof from.lng !== 'number') return null;
+
+  // 1. If destination is known, query OSRM steps
+  if (to && typeof to.lat === 'number' && typeof to.lng === 'number') {
+    try {
+      const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?steps=true&overview=false`;
+      const data = await fetchJson(url, {}, 5000);
+      const steps = data?.routes?.[0]?.legs?.[0]?.steps || [];
+      // Look for first upcoming turn/junction step after current point
+      const nextStep = steps.find(
+        (s, idx) => idx > 0 && s.maneuver && s.maneuver.type !== 'depart' && s.distance > 15
+      ) || steps[1] || steps[0];
+
+      if (nextStep) {
+        const dist = Math.round(nextStep.distance);
+        const distText = dist < 1000 ? `${dist} metres` : `${(dist / 1000).toFixed(1)} km`;
+        const mType = nextStep.maneuver?.type || 'turn';
+        const mMod = nextStep.maneuver?.modifier || '';
+        const roadName = nextStep.name || 'upcoming road';
+        let actionDesc = 'continue straight';
+        if (mType.includes('turn')) actionDesc = `turn ${mMod || 'ahead'}`;
+        else if (mType.includes('end of road')) actionDesc = `end of road, turn ${mMod || 'ahead'}`;
+        else if (mType.includes('roundabout')) actionDesc = 'enter roundabout';
+        else if (mType.includes('fork')) actionDesc = `keep ${mMod || 'left'}`;
+
+        return {
+          source: 'route_step',
+          name: roadName,
+          distanceMeters: dist,
+          distanceText: distText,
+          maneuver: `${mType} ${mMod}`.trim(),
+          actionDesc,
+        };
+      }
+    } catch {
+      // Fallback to Overpass below
+    }
+  }
+
+  // 2. Search nearby intersection or road junction via Overpass
+  try {
+    const q = `[out:json][timeout:5];node["highway"~"motorway_junction|junction|traffic_signals"](around:4000,${from.lat},${from.lng});out center 5;`;
+    const body = `data=${encodeURIComponent(q)}`;
+    for (const server of OVERPASS_SERVERS) {
+      try {
+        const data = await fetchJson(
+          server,
+          { method: 'POST', headers: { ...UA, 'Content-Type': 'application/x-www-form-urlencoded' }, body },
+          4000
+        );
+        if (data && Array.isArray(data.elements) && data.elements.length > 0) {
+          const nearest = data.elements
+            .map((e) => {
+              const eLat = e.lat ?? e.center?.lat;
+              const eLng = e.lon ?? e.center?.lon;
+              if (eLat == null || eLng == null) return null;
+              const distKm = haversineKm(from.lat, from.lng, eLat, eLng);
+              return {
+                name: e.tags?.name || e.tags?.ref || 'Road Intersection',
+                distanceMeters: Math.round(distKm * 1000),
+                distanceText: distKm < 1 ? `${Math.round(distKm * 1000)} metres` : `${distKm.toFixed(1)} km`,
+                actionDesc: 'upcoming intersection',
+              };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.distanceMeters - b.distanceMeters)[0];
+
+          if (nearest) return { source: 'osm_node', ...nearest };
+        }
+      } catch {}
+    }
+  } catch {}
+
+  return null;
+}
+
 function formatDuration(min) {
   if (min == null) return '';
   const h = Math.floor(min / 60);
@@ -229,6 +307,7 @@ module.exports = {
   haversineKm,
   geocode,
   getRoute,
+  getUpcomingJunction,
   formatDuration,
   findNearby,
   PLACE_KINDS,

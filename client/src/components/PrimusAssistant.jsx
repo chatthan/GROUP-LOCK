@@ -64,7 +64,7 @@ function loadSavedContacts() {
   }
 }
 
-function PrimusAssistant({ rideId, currentUserId = null, isLeader = false, socket = null }) {
+function PrimusAssistant({ rideId, currentUserId = null, isLeader = false, socket = null, currentLocation = null }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [isAwake, setIsAwake] = useState(false);
@@ -112,6 +112,7 @@ function PrimusAssistant({ rideId, currentUserId = null, isLeader = false, socke
   const processRef = useRef(() => {});
   const speakRef = useRef(() => {});
   const deactivateRef = useRef(() => {});
+  const endCaptureRef = useRef(() => {});
 
   useEffect(() => { isActiveRef.current = isActive; }, [isActive]);
   useEffect(() => { voiceEnabledRef.current = voiceEnabled; }, [voiceEnabled]);
@@ -122,6 +123,16 @@ function PrimusAssistant({ rideId, currentUserId = null, isLeader = false, socke
   useEffect(() => {
     if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
   }, [history, action]);
+
+  useEffect(() => {
+    if (currentLocation?.lat != null) {
+      posRef.current = {
+        lat: currentLocation.lat,
+        lng: currentLocation.lng ?? currentLocation.lon,
+        speed: currentLocation.speed || 0,
+      };
+    }
+  }, [currentLocation]);
 
   const addMsg = useCallback((sender, text, extra = {}) => {
     setHistory((prev) => [...prev.slice(-60), { sender, text, time: nowStamp(), ...extra }]);
@@ -144,7 +155,7 @@ function PrimusAssistant({ rideId, currentUserId = null, isLeader = false, socke
     window.speechSynthesis.onvoiceschanged = pick;
   }, []);
 
-  // ── Speaking (sentence-by-sentence; Chrome cuts long utterances) ──────────
+  // ── Speaking (sentence-by-sentence; mic uncoupled to prevent cut-offs) ──────────
   const speak = useCallback((text, onDone) => {
     const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
     const finish = () => {
@@ -153,10 +164,22 @@ function PrimusAssistant({ rideId, currentUserId = null, isLeader = false, socke
       ignoreUntilRef.current = Date.now() + POST_SPEECH_IGNORE_MS;
       consumedLenRef.current = fullLenRef.current; // discard whatever mic heard of our own voice
       if (onDone) onDone();
+      // Resume speech recognition safely after speech has completed
+      if (isActiveRef.current && recognizerRef.current) {
+        setTimeout(() => {
+          if (isActiveRef.current && !isSpeakingRef.current) {
+            try { recognizerRef.current.start(); } catch { /* noop */ }
+          }
+        }, 300);
+      }
     };
     if (!voiceEnabledRef.current || !synth || !text) {
       if (onDone) onDone();
       return;
+    }
+    // Pause speech recognition hardware while speaking to avoid cut-offs & audio collision
+    if (recognizerRef.current) {
+      try { recognizerRef.current.abort(); } catch { /* noop */ }
     }
     synth.cancel();
     const parts = text.match(/[^.!?]+[.!?]*/g)?.map((p) => p.trim()).filter(Boolean) || [text];
@@ -183,7 +206,21 @@ function PrimusAssistant({ rideId, currentUserId = null, isLeader = false, socke
   const reply = useCallback(
     (text, extra = {}) => {
       addMsg('primus', text, extra);
-      speakRef.current(text);
+      speakRef.current(text, () => {
+        // Natural follow-up: stay awake for 12 seconds so rider can ask follow-ups hands-free
+        if (isActiveRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          clearTimeout(windowTimerRef.current);
+          modeRef.current = 'window';
+          setIsAwake(true);
+          setLiveTranscript('Listening for follow-up, sir...');
+          windowTimerRef.current = setTimeout(() => {
+            if (modeRef.current === 'window') {
+              if (endCaptureRef.current) endCaptureRef.current();
+            }
+          }, WINDOW_MS);
+        }
+      });
     },
     [addMsg]
   );
@@ -370,26 +407,26 @@ function PrimusAssistant({ rideId, currentUserId = null, isLeader = false, socke
           }
 
           // Direct local UI commands:
-          if (/\b(close\s+contact|close\s+contacts|hide\s+contact|hide\s+contacts|dismiss\s+contact)\b/i.test(lower)) {
+          if (/\b(?:close|hide|dismiss|exit)\s+(?:the\s+)?contact(?:s)?\b/i.test(lower) || /^(?:close|hide)\s*contacts?$/i.test(lower.trim())) {
             setShowContacts(false);
             reply('Closing contacts panel, sir.');
             return;
           }
-          if (/\b(open\s+contact|open\s+contacts|show\s+contact|show\s+contacts)\b/i.test(lower) || /^contacts?$/i.test(lower.trim())) {
+          if (/\b(?:open|show|view|launch)\s+(?:the\s+)?contact(?:s)?\b/i.test(lower) || /^(?:the\s+)?contacts?$/i.test(lower.trim())) {
             setShowContacts(true);
             reply('Opening contacts panel, sir.');
             return;
           }
           if (
-            (/\b(open\s+(?:the\s+)?chat(?:\s+box)?|show\s+chat|view\s+chat)\b/i.test(lower) ||
-             /^(?:the\s+)?chat(?:\s+box)?$/i.test(lower.trim())) &&
+            (/\b(?:open|show|view|launch)\s+(?:the\s+)?chat(?:\s*box)?\b/i.test(lower) ||
+             /^(?:the\s+)?chat(?:\s*box)?$/i.test(lower.trim())) &&
             !/\b(send|tell|message|post|write|say)\b/i.test(lower)
           ) {
             window.dispatchEvent(new CustomEvent('primus:toggle_chat', { detail: { open: true } }));
             reply('Opening the in-ride chat drawer, sir.');
             return;
           }
-          if (/\b(close\s+(?:the\s+)?chat(?:\s+box)?|hide\s+chat|dismiss\s+chat)\b/i.test(lower)) {
+          if (/\b(?:close|hide|dismiss|exit)\s+(?:the\s+)?chat(?:\s*box)?\b/i.test(lower) || /^(?:close|hide)\s*chat(?:\s*box)?$/i.test(lower.trim())) {
             window.dispatchEvent(new CustomEvent('primus:toggle_chat', { detail: { open: false } }));
             reply('Closing the chat drawer, sir.');
             return;
@@ -436,6 +473,7 @@ function PrimusAssistant({ rideId, currentUserId = null, isLeader = false, socke
     setIsAwake(false);
     setLiveTranscript('');
   }, []);
+  useEffect(() => { endCaptureRef.current = endCapture; }, [endCapture]);
 
   const openWindow = useCallback(() => {
     // Wake word with no command: chime, acknowledge visually, and open active window
@@ -518,7 +556,8 @@ function PrimusAssistant({ rideId, currentUserId = null, isLeader = false, socke
         playJarvisWakeChime();
       }
 
-      const directive = modeRef.current === 'wake' ? afterWake(heard) : WAKE_REGEX.test(heard) ? afterWake(heard) : heard;
+      // If in wake or window mode: extract command, stripping wake phrase if present
+      const directive = WAKE_REGEX.test(heard) ? afterWake(heard) : heard;
       const combined = `${carryRef.current} ${directive}`.trim();
       captureTextRef.current = combined;
       setLiveTranscript(combined || 'Listening...');
@@ -539,10 +578,11 @@ function PrimusAssistant({ rideId, currentUserId = null, isLeader = false, socke
     r.onend = () => {
       // keep whatever was captured so a restart doesn't cut a sentence in half
       if (modeRef.current !== 'idle' && captureTextRef.current) carryRef.current = captureTextRef.current;
-      if (!isActiveRef.current) return;
+      // Do not restart recognizer while PRIMUS is speaking! finish() in speak() will resume cleanly.
+      if (!isActiveRef.current || isSpeakingRef.current) return;
       const ranFor = Date.now() - lastStartRef.current;
       quickEndsRef.current = ranFor < 1500 ? quickEndsRef.current + 1 : 0;
-      const delay = Math.min(300 * 2 ** Math.min(quickEndsRef.current, 4), 4000); // back-off if it keeps dying
+      const delay = Math.min(300 * 2 ** Math.min(quickEndsRef.current, 4), 3000);
       clearTimeout(restartTimerRef.current);
       restartTimerRef.current = setTimeout(startRecognizer, delay);
     };

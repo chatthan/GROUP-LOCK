@@ -430,7 +430,7 @@ async function executePrimusCommand(req, res, next) {
         targetAction = 'notify_ride_leader';
       } else if (has('regroup', 'rendezvous', 'meet at')) {
         targetAction = 'request_regrouping_point';
-      } else if (re(/\b(petrol|fuel|gas station|pump)\b/)) {
+      } else if (re(/\b(petrol|fuel|gas station|pump|bunk|diesel|cng|refuel)\b/)) {
         targetAction = 'find_fuel';
       } else if (re(/\b(hospital|clinic|doctor|medical)\b/)) {
         targetAction = 'find_hospital';
@@ -440,6 +440,10 @@ async function executePrimusCommand(req, res, next) {
         targetAction = 'find_atm';
       } else if (re(/\b(mechanic|puncture shop|bike shop|repair shop|workshop)\b/)) {
         targetAction = 'find_mechanic';
+      } else if (re(/\b(junction|crossroad|intersection|next turn|upcoming turn|turn next|which way|when should i turn|next maneuver)\b/)) {
+        targetAction = 'find_junction';
+      } else if (re(/\b(hazard|hazards|pothole|potholes|roadblock|oil spill|danger|obstacle|sos|accident|warning)\b/)) {
+        targetAction = 'get_active_alerts';
       } else if (has('group status', 'how many riders', 'convoy status', 'members')) {
         targetAction = 'get_group_status';
       } else if (has('who is behind', 'who is far', 'separation', 'straggler', 'trailing', 'where is everyone')) {
@@ -511,16 +515,31 @@ async function executePrimusCommand(req, res, next) {
       });
     }
 
-    // C. Active Alerts
+    // C. Active Alerts & Road Hazards
     if (targetAction === 'get_active_alerts') {
       const alerts = await Alert.find({ ride: rideId, resolved: false }).populate('user', 'name');
-      const hazards = await Hazard.find({ ride: rideId, resolved: false });
+      const hazards = await Hazard.find({ ride: rideId, resolved: false }).populate('reportedBy', 'name');
 
       let spoken = '';
       if (alerts.length === 0 && hazards.length === 0) {
-        spoken = 'All systems nominal, sir. There are no active SOS emergencies or reported road hazards on this route.';
+        spoken = 'All systems nominal, sir. No active road hazards, potholes, or SOS emergencies on your route.';
       } else {
-        spoken = `Tactical notice, sir: There are ${alerts.length} unresolved alerts and ${hazards.length} road hazards currently flagged.`;
+        const hazardDetails = hazards.map((h) => {
+          let distText = '';
+          if (myPos && typeof h.location?.coordinates?.[1] === 'number') {
+            const d = calculateDistanceKm(myPos.lat, myPos.lng, h.location.coordinates[1], h.location.coordinates[0]);
+            if (d != null) distText = d < 1 ? ` (${Math.round(d * 1000)}m ahead)` : ` (${d}km away)`;
+          }
+          return `${(h.type || 'Hazard').replace(/_/g, ' ')}${distText}`;
+        });
+
+        if (hazards.length > 0 && alerts.length > 0) {
+          spoken = `Tactical notice, sir: ${alerts.length} SOS alert(s) and ${hazards.length} road hazard(s) flagged ahead: ${hazardDetails.join(', ')}.`;
+        } else if (hazards.length > 0) {
+          spoken = `Caution, sir: ${hazards.length} road hazard(s) flagged on route: ${hazardDetails.join(', ')}. Exercise caution.`;
+        } else {
+          spoken = `Tactical emergency, sir: ${alerts.length} active SOS alert(s) reported in the convoy.`;
+        }
       }
 
       return res.json({
@@ -732,6 +751,11 @@ async function executePrimusCommand(req, res, next) {
     };
     if (nearbyKinds[targetAction]) {
       if (!myPos) {
+        if (ride.startCoords?.lat != null) {
+          myPos = { lat: ride.startCoords.lat, lng: ride.startCoords.lng };
+        }
+      }
+      if (!myPos) {
         return res.json({
           success: true,
           action: targetAction,
@@ -779,6 +803,44 @@ async function executePrimusCommand(req, res, next) {
       const approx = route.source === 'estimate' ? ' (approximate)' : '';
       const spoken = `${ride.destination || 'Your destination'} is ${route.distanceKm} kilometers away, sir. About ${brain.formatDuration(route.durationMin)}${approx}, arriving around ${arrival}.`;
       return res.json({ success: true, action: targetAction, spokenResponse: spoken, data: { ...route, destination: ride.destination } });
+    }
+
+    // H3. Upcoming Road Junction / Intersections
+    if (targetAction === 'find_junction') {
+      if (!myPos) {
+        if (ride.startCoords?.lat != null) {
+          myPos = { lat: ride.startCoords.lat, lng: ride.startCoords.lng };
+        }
+      }
+      if (!myPos) {
+        return res.json({
+          success: true,
+          action: targetAction,
+          spokenResponse: "I don't have your GPS coordinates yet, sir. Please allow location access to scan upcoming junctions.",
+        });
+      }
+
+      const dest =
+        typeof ride.destCoords?.lat === 'number'
+          ? { lat: ride.destCoords.lat, lng: ride.destCoords.lng }
+          : ride.destination
+          ? await brain.geocode(ride.destination)
+          : null;
+
+      const junction = await brain.getUpcomingJunction(myPos, dest);
+      let spoken = '';
+      if (junction) {
+        spoken = `Upcoming junction is ${junction.distanceText} ahead at ${junction.name}, sir. Recommended maneuver: ${junction.actionDesc}.`;
+      } else {
+        spoken = `No major road junctions detected immediately ahead, sir. Continue along your active route.`;
+      }
+
+      return res.json({
+        success: true,
+        action: targetAction,
+        spokenResponse: spoken,
+        data: { junction },
+      });
     }
 
     // I. Weather & Road Conditions (Open-Meteo & Real-Time Convoy Road Status)

@@ -5578,6 +5578,7 @@ function LiveRidePage() {
         currentUserId={user?.id}
         isLeader={isLeader}
         socket={getSocket()}
+        currentLocation={myLocation}
       />
     </div>
   );
