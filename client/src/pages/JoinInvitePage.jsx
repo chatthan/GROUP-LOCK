@@ -78,11 +78,13 @@ function JoinInvitePage() {
         <div className="absolute -top-24 -left-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Big Icon */}
-        <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-0.5 shadow-lg shadow-emerald-900/40">
-          <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center text-3xl">
-            🏍️
-          </div>
+        {/* GroupLock Mascot */}
+        <div className="w-24 h-28 mx-auto mb-3 flex items-center justify-center">
+          <img
+            src="/grouplock_logo.png"
+            alt="GroupLock Mascot"
+            className="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(6,182,212,0.35)]"
+          />
         </div>
 
         <h1 className="text-2xl font-bold tracking-tight text-white mb-1">

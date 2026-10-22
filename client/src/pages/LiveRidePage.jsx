@@ -3135,6 +3135,11 @@ function LiveRidePage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
+          <img
+            src="/grouplock_logo.png"
+            alt="GroupLock Mascot"
+            className="w-8 h-8 object-contain shrink-0 drop-shadow hidden xs:block"
+          />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold truncate max-w-[130px] sm:max-w-xs">{ride?.title || 'Live Ride'}</h2>

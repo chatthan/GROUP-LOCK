@@ -11,15 +11,27 @@ function Navbar() {
   }
 
   return (
-    <nav className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
-      <Link to="/" className="font-bold text-lg tracking-tight">
-        GROUP-LOCK
+    <nav className="bg-slate-900 text-white px-4 sm:px-6 py-3 sm:py-3.5 flex items-center justify-between border-b border-slate-800 shadow-md">
+      <Link to="/" className="flex items-center gap-2.5 group">
+        <img
+          src="/grouplock_logo.png"
+          alt="GroupLock Logo"
+          className="w-9 h-9 sm:w-10 sm:h-10 object-contain drop-shadow group-hover:scale-105 transition-transform"
+        />
+        <div className="flex flex-col leading-none">
+          <span className="font-black text-lg tracking-wider bg-gradient-to-r from-cyan-400 via-sky-300 to-amber-400 bg-clip-text text-transparent">
+            GROUP-LOCK
+          </span>
+          <span className="text-[9px] uppercase tracking-widest text-amber-400 font-extrabold hidden sm:block">
+            Ride Together
+          </span>
+        </div>
       </Link>
       <div className="flex items-center gap-4 text-sm">
         {isAuthenticated ? (
           <>
             <Link to="/dashboard" className="hover:text-slate-300 flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full overflow-hidden border border-red-500 bg-slate-800 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-cyan-500/60 bg-slate-800 flex items-center justify-center shadow-sm">
                 {user?.profilePic ? (
                   <img
                     src={user.profilePic}
@@ -28,13 +40,13 @@ function Navbar() {
                   />
                 ) : (
                   <img
-                    src="/motorcycle_badge.png"
+                    src="/grouplock_logo.png"
                     alt="Emblem"
                     className="w-full h-full object-contain p-0.5"
                   />
                 )}
               </div>
-              <span className="font-medium text-white">{user?.name}</span>
+              <span className="font-semibold text-white">{user?.name}</span>
             </Link>
             <button onClick={handleLogout} className="text-slate-400 hover:text-white transition-colors">
               Logout

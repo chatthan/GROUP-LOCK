@@ -263,9 +263,9 @@ function RegisterPage() {
           </div>
           <div className="flex-shrink-0 ml-3">
             <img
-              src="/motorcycle_badge.png"
-              alt="Motorcycle Badge"
-              className="w-16 h-16 sm:w-20 sm:h-20 object-contain rounded-full shadow-sm border border-slate-100 bg-white"
+              src="/grouplock_logo.png"
+              alt="GroupLock Mascot Logo"
+              className="w-16 h-20 sm:w-20 sm:h-24 object-contain drop-shadow-md"
             />
           </div>
         </div>

@@ -54,9 +54,9 @@ function DashboardPage() {
                 />
               ) : (
                 <img
-                  src="/motorcycle_badge.png"
-                  alt="Default Rider Emblem"
-                  className="w-full h-full object-contain p-2"
+                  src="/grouplock_logo.png"
+                  alt="GroupLock Mascot Emblem"
+                  className="w-full h-full object-contain p-1"
                 />
               )}
             </div>

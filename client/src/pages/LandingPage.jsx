@@ -27,15 +27,22 @@ function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
       {/* Hero */}
-      <section className="flex-1 flex flex-col items-center justify-center px-4 py-20 text-center">
-        <div className="mb-6 flex items-center justify-center gap-3">
-          <span className="text-6xl">🏍️</span>
+      <section className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center">
+        <div className="mb-6 flex items-center justify-center">
+          <img
+            src="/grouplock_logo.png"
+            alt="GroupLock Mascot Logo"
+            className="w-48 h-56 sm:w-56 sm:h-64 object-contain drop-shadow-[0_15px_30px_rgba(6,182,212,0.4)] hover:scale-105 transition-transform duration-300"
+          />
         </div>
-        <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight text-white mb-4">
-          GROUP<span className="text-emerald-400">-LOCK</span>
+        <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white mb-2">
+          GROUP<span className="text-cyan-400">-LOCK</span>
         </h1>
-        <p className="text-lg sm:text-xl text-slate-300 max-w-xl mb-10 leading-relaxed">
-          Real-time group ride tracking, coordination &amp; safety — all in one place.
+        <p className="text-xs uppercase tracking-widest text-amber-400 font-extrabold mb-4">
+          Ride Together • Stay Together
+        </p>
+        <p className="text-base sm:text-xl text-slate-300 max-w-xl mb-8 leading-relaxed">
+          Intelligent group motorcycle ride safety, live GPS convoy tracking, and PRIMUS AI voice companion.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
