@@ -6,7 +6,10 @@
   "type": "commonjs",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "test:stress": "node scripts/stress_test.js",
+    "test:timeout": "node scripts/timeout_test.js",
+    "test": "node scripts/stress_test.js && node scripts/timeout_test.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
