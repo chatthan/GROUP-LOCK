@@ -252,6 +252,7 @@ function LiveRidePage() {
   const [hazardNote, setHazardNote] = useState('');
   const [isReportingHazard, setIsReportingHazard] = useState(false);
   const [liveWeather, setLiveWeather] = useState(null);
+  const [showWeatherModal, setShowWeatherModal] = useState(false);
   const [showSimulationModal, setShowSimulationModal] = useState(false);
   const hazardMarkersRef = useRef({});
   const lastHazardAlertTimesRef = useRef(new Map());
@@ -1943,11 +1944,13 @@ function LiveRidePage() {
 
   // Stage 10: Live Road Weather Monitoring (Open-Meteo)
   useEffect(() => {
-    if (!myLocation || typeof myLocation.lat !== 'number') return;
+    const targetLat = myLocation?.lat ?? ride?.startCoords?.lat;
+    const targetLng = myLocation?.lng ?? ride?.startCoords?.lng;
+    if (typeof targetLat !== 'number' || typeof targetLng !== 'number' || isNaN(targetLat) || isNaN(targetLng)) return;
 
     let isMounted = true;
     async function updateWeather() {
-      const data = await fetchLiveRoadWeather(myLocation.lat, myLocation.lng);
+      const data = await fetchLiveRoadWeather(targetLat, targetLng);
       if (isMounted && data) {
         setLiveWeather(data);
       }
@@ -1959,7 +1962,7 @@ function LiveRidePage() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [myLocation?.lat, myLocation?.lng]);
+  }, [myLocation?.lat, myLocation?.lng, ride?.startCoords?.lat, ride?.startCoords?.lng]);
 
   // Dynamic Route Shortening (Google Maps style) & Co-Rider to Leader Routes
   useEffect(() => {
@@ -3200,37 +3203,25 @@ function LiveRidePage() {
 
         {/* Stage 10: Live Road Weather Chip */}
         {liveWeather && (
-          <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-bold transition shadow-sm shrink-0 ${
+          <button
+            type="button"
+            onClick={() => setShowWeatherModal(true)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-bold transition shadow-sm shrink-0 cursor-pointer ${
               liveWeather.isHazardous
-                ? 'bg-blue-950/80 text-blue-200 border-blue-400/80 animate-pulse'
-                : 'bg-slate-900 text-slate-200 border-slate-700/80'
+                ? 'bg-blue-950/80 hover:bg-blue-900/80 text-blue-200 border-blue-400/80 animate-pulse'
+                : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700/80'
             }`}
-            title={`Live Road Weather: ${liveWeather.description} (${liveWeather.temperature}°C, Wind ${liveWeather.windSpeed} km/h). ${liveWeather.caution ? `Caution: ${liveWeather.caution}` : ''}`}
+            title={`Live Road Weather: ${liveWeather.description || liveWeather.condition} (${liveWeather.temperature ?? liveWeather.temp}°C, Wind ${liveWeather.windSpeed} km/h). Click for weather details.`}
           >
-            <span>{liveWeather.icon || '☀️'}</span>
-            <span>{liveWeather.temperature}°C</span>
-            <span className="text-[11px] font-medium text-slate-400">({liveWeather.condition})</span>
+            <span className="text-sm">{liveWeather.icon || '☀️'}</span>
+            <span className="font-mono text-slate-100">{liveWeather.temperature ?? liveWeather.temp}°C</span>
+            <span className="text-[11px] font-medium text-slate-300">({liveWeather.condition || liveWeather.description})</span>
             {isLeader && liveWeather.isHazardous && (
-              <button
-                type="button"
-                onClick={() => {
-                  const targetCondition = liveWeather.suggestedCondition || 'Rain/Wet';
-                  const targetLimit = liveWeather.suggestedSpeedLimit || 60;
-                  setSelectedRoadCondition(targetCondition);
-                  setConditionSpeeds((prev) => ({
-                    ...prev,
-                    [targetCondition]: targetLimit,
-                  }));
-                  setShowSpeedLimitModal(true);
-                }}
-                className="ml-1 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] px-1.5 py-0.5 rounded font-extrabold uppercase transition"
-                title="Apply weather recommended speed limit to convoy"
-              >
-                Apply {liveWeather.suggestedSpeedLimit} km/h
-              </button>
+              <span className="ml-1 bg-amber-500 text-slate-950 text-[10px] px-1.5 py-0.5 rounded font-extrabold uppercase">
+                {liveWeather.suggestedSpeedLimit}kph
+              </span>
             )}
-          </div>
+          </button>
         )}
 
         {/* Stage 7: Low-Bandwidth Mode Toggle */}
@@ -5296,6 +5287,138 @@ function LiveRidePage() {
                 Only the ride leader can adjust speed limits and road conditions.
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* STAGE 10: LIVE ROAD WEATHER MODAL */}
+      {showWeatherModal && liveWeather && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 text-white shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{liveWeather.icon || '🌤️'}</span>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Live Road Weather & Atmosphere</h3>
+                  <p className="text-[11px] text-slate-400">Real-time telemetry along active route via Open-Meteo</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWeatherModal(false)}
+                className="text-slate-400 hover:text-white text-base p-1 rounded transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Weather Hero Card */}
+            <div className={`p-4 rounded-xl border flex items-center justify-between ${
+              liveWeather.isHazardous
+                ? 'bg-gradient-to-r from-blue-950/80 to-slate-900 border-blue-500/50'
+                : 'bg-gradient-to-r from-slate-800/80 to-slate-900 border-slate-700/80'
+            }`}>
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">{liveWeather.icon || '☀️'}</span>
+                <div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-extrabold text-white font-mono">
+                      {liveWeather.temperature ?? liveWeather.temp ?? '--'}
+                    </span>
+                    <span className="text-lg text-slate-300 font-bold">°C</span>
+                  </div>
+                  <div className="text-sm font-bold text-amber-400">
+                    {liveWeather.condition || liveWeather.description || 'Fair'}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide ${
+                  liveWeather.isHazardous ? 'bg-red-500/30 text-red-300 border border-red-500/50' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                }`}>
+                  {liveWeather.isHazardous ? 'Hazard Alert' : 'Road Optimal'}
+                </span>
+                <div className="text-[10px] text-slate-400 mt-1 font-mono">
+                  {liveWeather.isDay ? 'Day Conditions' : 'Night Riding'}
+                </div>
+              </div>
+            </div>
+
+            {/* Environmental 4-Grid */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-slate-800/70 border border-slate-700/60 p-2.5 rounded-xl">
+                <div className="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1">
+                  <span>💨</span> Wind Speed
+                </div>
+                <div className="text-base font-extrabold text-slate-100 mt-0.5 font-mono">
+                  {liveWeather.windSpeed ?? '--'} <span className="text-xs font-normal text-slate-400">km/h</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-800/70 border border-slate-700/60 p-2.5 rounded-xl">
+                <div className="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1">
+                  <span>🌧️</span> Rain Probability
+                </div>
+                <div className="text-base font-extrabold text-slate-100 mt-0.5 font-mono">
+                  {liveWeather.precipProb ?? 0} <span className="text-xs font-normal text-slate-400">%</span>
+                </div>
+              </div>
+
+              <div className="bg-slate-800/70 border border-slate-700/60 p-2.5 rounded-xl">
+                <div className="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1">
+                  <span>🛣️</span> Recommended Surface
+                </div>
+                <div className="text-sm font-bold text-amber-300 mt-0.5">
+                  {liveWeather.suggestedCondition || liveWeather.roadCondition || 'Highway'}
+                </div>
+              </div>
+
+              <div className="bg-slate-800/70 border border-slate-700/60 p-2.5 rounded-xl">
+                <div className="text-slate-400 text-[10px] uppercase font-bold flex items-center gap-1">
+                  <span>⚡</span> Suggested Speed
+                </div>
+                <div className="text-base font-extrabold text-emerald-400 mt-0.5 font-mono">
+                  {liveWeather.suggestedSpeedLimit || 80} <span className="text-xs font-normal text-slate-400">km/h</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Caution Warning Box */}
+            {(liveWeather.caution || liveWeather.warning || liveWeather.isHazardous) && (
+              <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-xs text-amber-200 flex items-start gap-2.5">
+                <span className="text-base shrink-0">⚠️</span>
+                <p className="leading-snug">
+                  {liveWeather.caution || liveWeather.warning || 'Adverse weather on route. Reduce speed and keep extended following distance.'}
+                </p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowWeatherModal(false)}
+                className="flex-1 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition"
+              >
+                Close
+              </button>
+              {isLeader && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetCondition = liveWeather.suggestedCondition || liveWeather.roadCondition || 'Highway';
+                    const targetLimit = liveWeather.suggestedSpeedLimit || 80;
+                    handleUpdateSpeedLimit(targetCondition, targetLimit);
+                    setShowWeatherModal(false);
+                  }}
+                  className="flex-1 py-2 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-lg shadow-lg shadow-amber-600/30 transition flex items-center justify-center gap-1.5"
+                >
+                  <span>⚡</span>
+                  <span>Apply {liveWeather.suggestedSpeedLimit || 80} km/h to Convoy</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
