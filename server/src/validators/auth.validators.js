@@ -27,8 +27,14 @@ function validateRegisterInput({ name, email, phone, username, password, pincode
     const dobDate = new Date(dob);
     const today = new Date();
     today.setHours(23, 59, 59, 999);
+    const eighteenYearsAgo = new Date();
+    eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
+    eighteenYearsAgo.setHours(23, 59, 59, 999);
+
     if (isNaN(dobDate.getTime()) || dobDate > today) {
       errors.push('Date of Birth cannot be in the future.');
+    } else if (dobDate > eighteenYearsAgo) {
+      errors.push('You must be at least 18 years old to register.');
     }
   }
 

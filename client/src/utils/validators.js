@@ -45,10 +45,16 @@ export function validateRegisterForm({
     const dobDate = new Date(dob);
     const today = new Date();
     today.setHours(23, 59, 59, 999);
+    const eighteenYearsAgo = new Date();
+    eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
+    eighteenYearsAgo.setHours(23, 59, 59, 999);
+
     if (isNaN(dobDate.getTime())) {
       errors.dob = 'Enter a valid Date of Birth.';
     } else if (dobDate > today) {
       errors.dob = 'Date of Birth cannot be in the future.';
+    } else if (dobDate > eighteenYearsAgo) {
+      errors.dob = 'You must be at least 18 years old to register for GROUP-LOCK.';
     }
   }
 

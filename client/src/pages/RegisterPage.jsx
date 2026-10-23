@@ -145,14 +145,29 @@ function RegisterPage() {
     };
   }, [form.pincode]);
 
-  const todayDate = new Date().toISOString().split('T')[0];
+  // Minimum 18 years old restriction
+  const maxDobDate = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 18);
+    return d.toISOString().split('T')[0];
+  })();
 
   function handleChange(e) {
     const { name, value } = e.target;
     if (name === 'dob') {
-      if (value && value > todayDate) {
-        setFieldErrors((prev) => ({ ...prev, dob: 'Date of Birth cannot be in the future.' }));
-        return;
+      if (value) {
+        if (value > maxDobDate) {
+          setFieldErrors((prev) => ({
+            ...prev,
+            dob: 'You must be at least 18 years old to register for GROUP-LOCK.',
+          }));
+        } else {
+          setFieldErrors((prev) => {
+            const updated = { ...prev };
+            delete updated.dob;
+            return updated;
+          });
+        }
       }
     }
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -434,21 +449,32 @@ function RegisterPage() {
 
           {/* DOB */}
           <div>
-            <label htmlFor="dob" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              DOB *
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="dob" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                Date of Birth *
+              </label>
+              <span className="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
+                Must be 18+ years
+              </span>
+            </div>
             <input
               id="dob"
               name="dob"
               type="date"
-              max={todayDate}
+              max={maxDobDate}
               value={form.dob}
               onChange={handleChange}
               className={`w-full border rounded-lg px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 ${
-                fieldErrors.dob ? 'border-red-400' : 'border-slate-300'
+                fieldErrors.dob ? 'border-red-400 bg-red-50/50' : 'border-slate-300'
               }`}
             />
-            {fieldErrors.dob && <p className="text-xs text-red-600 mt-1">{fieldErrors.dob}</p>}
+            {fieldErrors.dob ? (
+              <p className="text-xs text-red-600 font-medium mt-1">{fieldErrors.dob}</p>
+            ) : (
+              <p className="text-[11px] text-slate-500 mt-1">
+                Only riders aged 18 and older are permitted to register.
+              </p>
+            )}
           </div>
 
           {/* Select Gender */}

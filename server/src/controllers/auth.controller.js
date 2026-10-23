@@ -332,10 +332,20 @@ async function updateProfile(req, res, next) {
         const dobDate = new Date(dob);
         const today = new Date();
         today.setHours(23, 59, 59, 999);
+        const eighteenYearsAgo = new Date();
+        eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
+        eighteenYearsAgo.setHours(23, 59, 59, 999);
+
         if (isNaN(dobDate.getTime()) || dobDate > today) {
           const err = new Error('Date of Birth cannot be in the future.');
           err.statusCode = 400;
           err.code = 'VALIDATION_ERROR';
+          return next(err);
+        }
+        if (dobDate > eighteenYearsAgo) {
+          const err = new Error('You must be at least 18 years old.');
+          err.statusCode = 400;
+          err.code = 'AGE_RESTRICTION';
           return next(err);
         }
       }

@@ -37,7 +37,8 @@ router.get('/', async (req, res, next) => {
         emergencyContact: a.user?.emergencyContact || null,
       },
       location: a.location,
-      note: a.note || '',
+      note: a.note || a.description || '',
+      description: a.description || a.note || '',
       escalationLevel: a.escalationLevel || 'CONVOY',
       escalatedAt: a.escalatedAt || null,
       createdAt: a.createdAt,
@@ -81,6 +82,8 @@ router.patch('/:id/escalate', async (req, res, next) => {
         alertId: id,
         escalationLevel: alert.escalationLevel,
         escalatedAt: alert.escalatedAt,
+        note: alert.note || alert.description || '',
+        description: alert.description || alert.note || '',
         user: {
           id: alert.user?._id || alert.user,
           name: alert.user?.name || 'Rider',

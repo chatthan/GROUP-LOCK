@@ -523,7 +523,7 @@ function initSocketServer(httpServer) {
     });
 
     // 4. Trigger SOS Emergency Alert (Stage 6 Enhanced)
-    socket.on('sos:trigger', async ({ rideId, lat, lng, note }, callback) => {
+    socket.on('sos:trigger', async ({ rideId, lat, lng, note, description }, callback) => {
       try {
         if (!rideId) return;
 
@@ -531,6 +531,7 @@ function initSocketServer(httpServer) {
         if (!ride) return;
 
         const fullUser = await User.findById(socket.user._id);
+        const resolvedNote = (description || note || '').trim() || 'Emergency SOS triggered by rider!';
 
         const alert = await Alert.create({
           ride: rideId,
@@ -538,7 +539,8 @@ function initSocketServer(httpServer) {
           user: socket.user._id,
           type: 'sos',
           location: lat && lng ? { lat, lng } : undefined,
-          note: note || 'Emergency SOS triggered by rider!',
+          note: resolvedNote,
+          description: resolvedNote,
           escalationLevel: 'CONVOY',
           resolved: false,
         });
@@ -554,7 +556,8 @@ function initSocketServer(httpServer) {
           metadata: {
             alertId: alert._id,
             escalationLevel: 'CONVOY',
-            note: alert.note,
+            note: resolvedNote,
+            description: resolvedNote,
           },
         }).catch(() => {});
 
@@ -571,7 +574,8 @@ function initSocketServer(httpServer) {
             emergencyContact: fullUser?.emergencyContact || null,
           },
           location: lat && lng ? { lat, lng } : null,
-          note: alert.note,
+          note: resolvedNote,
+          description: resolvedNote,
           escalationLevel: alert.escalationLevel,
           escalatedAt: alert.escalatedAt,
           createdAt: alert.createdAt,
@@ -579,6 +583,32 @@ function initSocketServer(httpServer) {
 
         // Broadcast to ALL riders in the room with highest priority
         io.to(`ride:${rideId}`).emit('sos:alert', sosPayload);
+
+        // Also post an emergency announcement in convoy chat so the description is visible to all
+        try {
+          const chatMsg = await Message.create({
+            ride: rideId,
+            group: ride.group,
+            sender: socket.user._id,
+            isPrivate: false,
+            text: `🚨 [EMERGENCY SOS] ${socket.user.name}: ${resolvedNote}`,
+          });
+          io.to(`ride:${rideId}`).emit('chat:new_message', {
+            id: chatMsg._id,
+            rideId,
+            text: chatMsg.text,
+            isPrivate: false,
+            recipient: null,
+            sender: {
+              id: socket.user._id.toString(),
+              name: socket.user.name,
+              profilePic: socket.user.profilePic || '',
+            },
+            createdAt: chatMsg.createdAt,
+          });
+        } catch (chatErr) {
+          console.warn('[Socket] Failed to post SOS to chat:', chatErr.message);
+        }
 
         if (callback) callback({ success: true, alert: sosPayload });
       } catch (err) {
@@ -1496,6 +1526,8 @@ function initSocketServer(httpServer) {
               escalationLevel: 'EMERGENCY_CONTACTS',
               escalatedAt: alert.escalatedAt,
               autoEscalated: true,
+              note: alert.note || alert.description || '',
+              description: alert.description || alert.note || '',
               user: {
                 id: alert.user?._id || alert.user,
                 name: alert.user?.name || 'Rider',

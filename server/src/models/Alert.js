@@ -31,6 +31,11 @@ const alertSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    description: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     escalationLevel: {
       type: String,
       enum: ['CONVOY', 'EMERGENCY_CONTACTS', 'AUTHORITIES'],
@@ -47,6 +52,12 @@ const alertSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+alertSchema.pre('save', function (next) {
+  if (!this.note && this.description) this.note = this.description;
+  if (!this.description && this.note) this.description = this.note;
+  next();
+});
 
 alertSchema.index({ ride: 1, resolved: 1 });
 

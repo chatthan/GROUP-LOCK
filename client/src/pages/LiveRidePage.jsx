@@ -285,6 +285,7 @@ function LiveRidePage() {
   const routeCoordinatesRef = useRef([]);
   const regroupMarkerRef = useRef(null);
   const regroupLineRef = useRef(null);
+  const sosMarkerRef = useRef(null);
   const chatMessagesEndRef = useRef(null);
 
   // Convoy Members Roster for Private Chat and Roster Selection
@@ -1272,16 +1273,20 @@ function LiveRidePage() {
     socket.on('sos:alert', (alert) => {
       playSoundNotification('sos');
       setActiveSosAlert(alert);
+      const noteText = alert.note || alert.description || '';
       addToast({
         type: 'sos',
         title: '🚨 EMERGENCY SOS ALERT',
-        message: `${alert.user?.name} triggered an SOS!`,
+        message: `${alert.user?.name || 'A rider'} triggered an SOS!${noteText ? ` Note: "${noteText}"` : ''}`,
         alert,
       });
-      speakVoiceAlert(`Emergency! SOS activated by ${alert.user?.name || 'convoy rider'}! Location marked on map.`, {
-        priority: 'CRITICAL',
-        category: 'SOS',
-      });
+      speakVoiceAlert(
+        `Emergency! SOS activated by ${alert.user?.name || 'convoy rider'}! ${noteText ? `Reported situation: ${noteText}. ` : ''}Location marked on map.`,
+        {
+          priority: 'CRITICAL',
+          category: 'SOS',
+        }
+      );
     });
 
     // Stage 6: Real-time SOS Escalated
@@ -1291,7 +1296,10 @@ function LiveRidePage() {
         ...(prev || {}),
         ...data,
         id: data.alertId,
+        note: data.note || prev?.note || '',
+        description: data.description || prev?.description || data.note || prev?.note || '',
       }));
+      const noteText = data.note || data.description || '';
       addToast({
         type: 'sos',
         title: '🚨 SOS ALERT ESCALATED',
@@ -1299,12 +1307,12 @@ function LiveRidePage() {
           data.escalationLevel === 'EMERGENCY_CONTACTS'
             ? 'Emergency ICE Contacts'
             : 'National Authorities / Services'
-        }!`,
+        }!${noteText ? ` Note: "${noteText}"` : ''}`,
       });
       speakVoiceAlert(
         `Emergency SOS escalated to ${
           data.escalationLevel === 'EMERGENCY_CONTACTS' ? 'emergency contacts' : 'authorities'
-        }!`,
+        }! ${noteText ? `Situation: ${noteText}.` : ''}`,
         { priority: 'CRITICAL', category: 'SOS' }
       );
     });
@@ -2182,6 +2190,67 @@ function LiveRidePage() {
     }
   }, [activeRegroup, myLocation, mapReady]);
 
+  // Stage 6: Interactive SOS Emergency Beacon Pin on Leaflet Map
+  useEffect(() => {
+    if (!mapRef.current || !mapReady) return;
+    const map = mapRef.current;
+
+    if (activeSosAlert && activeSosAlert.location?.lat && activeSosAlert.location?.lng) {
+      const { lat, lng } = activeSosAlert.location;
+      const riderName = activeSosAlert.user?.name || 'Convoy Rider';
+      const noteText = activeSosAlert.note || activeSosAlert.description || 'Emergency assistance requested!';
+      const phone = activeSosAlert.user?.phone || '';
+      const icePhone = activeSosAlert.user?.emergencyContact?.phone || '';
+
+      const sosIcon = L.divIcon({
+        className: 'sos-live-beacon-marker',
+        html: `
+          <div style="position:relative;display:flex;align-items:center;justify-content:center;width:48px;height:48px;">
+            <div style="position:absolute;width:44px;height:44px;border-radius:50%;background:rgba(239,68,68,0.45);animation:ping 1.2s cubic-bezier(0,0,0.2,1) infinite;"></div>
+            <div style="position:absolute;width:34px;height:34px;border-radius:50%;background:#dc2626;box-shadow:0 0 16px rgba(220,38,38,0.9);display:flex;align-items:center;justify-content:center;border:2px solid #ffffff;color:white;font-size:16px;">
+              🚨
+            </div>
+          </div>
+        `,
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
+      });
+
+      const popupHtml = `
+        <div style="padding:6px;font-family:sans-serif;min-width:220px;">
+          <div style="font-weight:900;color:#dc2626;font-size:13px;display:flex;align-items:center;gap:5px;border-bottom:1px solid #fee2e2;padding-bottom:4px;">
+            <span>🚨</span> EMERGENCY SOS
+          </div>
+          <div style="font-size:12px;font-weight:700;color:#0f172a;margin-top:4px;">
+            ${riderName}
+          </div>
+          <div style="background:#fef2f2;border:1px solid #f87171;border-radius:6px;padding:6px;margin:6px 0;font-size:11px;font-weight:700;color:#991b1b;word-break:break-word;">
+            <span style="text-transform:uppercase;font-size:9px;color:#b91c1c;display:block;margin-bottom:2px;">Reported Situation:</span>
+            "${noteText}"
+          </div>
+          ${phone ? `<a href="tel:${phone}" style="display:block;background:#dc2626;color:white;text-align:center;padding:5px;border-radius:5px;font-weight:700;font-size:11px;text-decoration:none;margin-top:4px;">📞 Call ${riderName}</a>` : ''}
+          ${icePhone ? `<a href="tel:${icePhone}" style="display:block;background:#f59e0b;color:#0f172a;text-align:center;padding:5px;border-radius:5px;font-weight:800;font-size:11px;text-decoration:none;margin-top:4px;">🆘 Call ICE Contact</a>` : ''}
+        </div>
+      `;
+
+      if (sosMarkerRef.current && map.hasLayer(sosMarkerRef.current)) {
+        sosMarkerRef.current.setLatLng([lat, lng]);
+        sosMarkerRef.current.setIcon(sosIcon);
+        sosMarkerRef.current.setPopupContent(popupHtml);
+      } else {
+        const marker = L.marker([lat, lng], { icon: sosIcon, zIndexOffset: 3000 }).addTo(map);
+        marker.bindPopup(popupHtml, { maxWidth: 260, closeButton: true });
+        marker.bindTooltip(`🚨 SOS: ${riderName} - "${noteText}"`, { sticky: true });
+        sosMarkerRef.current = marker;
+      }
+    } else {
+      if (sosMarkerRef.current && map.hasLayer(sosMarkerRef.current)) {
+        map.removeLayer(sosMarkerRef.current);
+        sosMarkerRef.current = null;
+      }
+    }
+  }, [activeSosAlert, mapReady]);
+
   // 5. Broadcast GPS Location via Geolocation API (or Simulator) with Stage 7 Dead-Zone Buffering
   const broadcastLocation = useCallback(
     async (lat, lng, speed = 0, heading = 0, accuracy = null) => {
@@ -2403,8 +2472,9 @@ function LiveRidePage() {
 
     const lat = myLocation?.lat || null;
     const lng = myLocation?.lng || null;
+    const noteToSend = (sosNote || '').trim();
 
-    socket.emit('sos:trigger', { rideId, lat, lng, note: sosNote }, (res) => {
+    socket.emit('sos:trigger', { rideId, lat, lng, note: noteToSend, description: noteToSend }, (res) => {
       if (res && res.success) {
         setShowSosModal(false);
         setSosNote('');
@@ -3589,12 +3659,19 @@ function LiveRidePage() {
                 )}
               </div>
 
-              <p className="text-xs text-red-100 mt-1 font-medium">
-                {activeSosAlert.note || 'Emergency assistance requested by rider!'}
-              </p>
+              {/* Prominent SOS Description Box */}
+              <div className="mt-2 p-2.5 rounded-lg bg-black/60 border border-red-400/60 shadow-inner">
+                <div className="text-[10px] uppercase font-black tracking-wider text-amber-400 flex items-center gap-1.5 mb-0.5">
+                  <span>📝</span>
+                  <span>Emergency Situation / Description:</span>
+                </div>
+                <div className="text-sm font-extrabold text-white leading-snug break-words">
+                  {activeSosAlert.note || activeSosAlert.description || 'Emergency assistance requested by rider!'}
+                </div>
+              </div>
 
               {/* Direct Emergency Contacts Hotlinks */}
-              <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs">
+              <div className="flex flex-wrap items-center gap-3 mt-2 text-xs">
                 {activeSosAlert.user?.phone && (
                   <a
                     href={`tel:${activeSosAlert.user.phone}`}
@@ -3632,6 +3709,9 @@ function LiveRidePage() {
                       16,
                       { animate: true }
                     );
+                    if (sosMarkerRef.current) {
+                      sosMarkerRef.current.openPopup();
+                    }
                   }
                 }}
                 className="text-xs bg-white text-red-700 font-bold px-3 py-1.5 rounded-lg shadow hover:bg-red-50 transition"
@@ -5051,14 +5131,19 @@ function LiveRidePage() {
             </div>
 
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Optional Note / Situation:</label>
-              <input
-                type="text"
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Emergency Situation / Description Note:
+              </label>
+              <textarea
+                rows={2}
                 value={sosNote}
                 onChange={(e) => setSosNote(e.target.value)}
-                placeholder="e.g. Flat tyre, breakdown, medical need"
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-red-500"
+                placeholder="e.g. Bike crashed, puncture, severe injury, engine breakdown..."
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
               />
+              <p className="text-[11px] text-amber-400 font-medium mt-1">
+                ⚠️ This description will be broadcasted live to all convoy riders and pinned on the map.
+              </p>
             </div>
 
             <div className="flex gap-2">
