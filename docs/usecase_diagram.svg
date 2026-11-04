@@ -1,0 +1,242 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1150 920" width="100%" height="100%" style="background:#F8FAFC; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <defs>
+    <!-- Shadow Filter -->
+    <filter id="cardShadow" x="-5%" y="-5%" width="110%" height="110%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0F172A" flood-opacity="0.08"/>
+    </filter>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <!-- Arrow Markers -->
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowInclude" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#2563EB"/>
+    </marker>
+    <marker id="arrowExtend" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#D97706"/>
+    </marker>
+  </defs>
+
+  <!-- Title Header -->
+  <rect x="30" y="20" width="1090" height="60" rx="8" fill="#0F172A"/>
+  <text x="50" y="56" fill="#FFFFFF" font-size="22" font-weight="700">UML USE CASE DIAGRAM — GROUP-LOCK SYSTEM</text>
+  <text x="830" y="55" fill="#94A3B8" font-size="13">Specification Model: Agile Scrum Release 1.0</text>
+
+  <!-- ================= SYSTEM BOUNDARY ================= -->
+  <rect x="250" y="105" width="650" height="785" rx="14" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.5" filter="url(#cardShadow)"/>
+  <rect x="250" y="105" width="650" height="40" rx="14" fill="#EFF6FF"/>
+  <text x="575" y="131" text-anchor="middle" fill="#1E3A8A" font-size="16" font-weight="800" letter-spacing="0.5">GROUP-LOCK PLATFORM BOUNDARY</text>
+
+  <!-- ================= USE CASES (ELLIPSES) ================= -->
+  
+  <!-- UC-01: Authentication -->
+  <g id="uc1">
+    <ellipse cx="400" cy="180" rx="110" ry="24" fill="#F8FAFC" stroke="#3B82F6" stroke-width="1.8"/>
+    <text x="400" y="184" text-anchor="middle" fill="#0F172A" font-size="12.5" font-weight="600">Register &amp; Authenticate</text>
+  </g>
+
+  <!-- UC-02: Profile Management -->
+  <g id="uc2">
+    <ellipse cx="730" cy="180" rx="100" ry="24" fill="#F8FAFC" stroke="#3B82F6" stroke-width="1.8"/>
+    <text x="730" y="184" text-anchor="middle" fill="#0F172A" font-size="12" font-weight="600">Manage Rider Profile</text>
+  </g>
+
+  <!-- UC-03: Create & Manage Group -->
+  <g id="uc3">
+    <ellipse cx="380" cy="255" rx="115" ry="25" fill="#F8FAFC" stroke="#3B82F6" stroke-width="1.8"/>
+    <text x="380" y="259" text-anchor="middle" fill="#0F172A" font-size="12.5" font-weight="600">Create &amp; Manage Group</text>
+  </g>
+
+  <!-- UC-04: Generate Expiring Invite Code -->
+  <g id="uc4">
+    <ellipse cx="730" cy="255" rx="110" ry="24" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="730" y="259" text-anchor="middle" fill="#1E40AF" font-size="11.5" font-weight="600">Generate 24h Invite Code</text>
+  </g>
+
+  <!-- UC-05: Join Group via Code -->
+  <g id="uc5">
+    <ellipse cx="380" cy="330" rx="105" ry="24" fill="#F8FAFC" stroke="#3B82F6" stroke-width="1.8"/>
+    <text x="380" y="334" text-anchor="middle" fill="#0F172A" font-size="12.5" font-weight="600">Join Group via Code</text>
+  </g>
+
+  <!-- UC-06: Schedule & Manage Ride -->
+  <g id="uc6">
+    <ellipse cx="400" cy="405" rx="115" ry="25" fill="#F8FAFC" stroke="#3B82F6" stroke-width="1.8"/>
+    <text x="400" y="409" text-anchor="middle" fill="#0F172A" font-size="12.5" font-weight="600">Schedule &amp; Control Ride</text>
+  </g>
+
+  <!-- UC-07: Stream Live Telemetry (GPS) -->
+  <g id="uc7">
+    <ellipse cx="400" cy="485" rx="120" ry="26" fill="#F8FAFC" stroke="#3B82F6" stroke-width="1.8"/>
+    <text x="400" y="489" text-anchor="middle" fill="#0F172A" font-size="12.5" font-weight="600">Stream Live GPS Telemetry</text>
+  </g>
+
+  <!-- UC-08: View Convoy Tracking Map -->
+  <g id="uc8">
+    <ellipse cx="730" cy="485" rx="115" ry="25" fill="#F8FAFC" stroke="#3B82F6" stroke-width="1.8"/>
+    <text x="730" y="489" text-anchor="middle" fill="#0F172A" font-size="12" font-weight="600">View Convoy Moving Map</text>
+  </g>
+
+  <!-- UC-09: Automated Straggler Detection -->
+  <g id="uc9">
+    <ellipse cx="730" cy="565" rx="115" ry="25" fill="#FEF2F2" stroke="#EF4444" stroke-width="2"/>
+    <text x="730" y="569" text-anchor="middle" fill="#991B1B" font-size="12" font-weight="700">Detect Convoy Stragglers</text>
+  </g>
+
+  <!-- UC-10: Trigger Emergency SOS -->
+  <g id="uc10">
+    <ellipse cx="400" cy="580" rx="115" ry="26" fill="#FEF2F2" stroke="#EF4444" stroke-width="2"/>
+    <text x="400" y="584" text-anchor="middle" fill="#991B1B" font-size="13" font-weight="700">Trigger Emergency SOS</text>
+  </g>
+
+  <!-- UC-11: Broadcast Siren & Alert -->
+  <g id="uc11">
+    <ellipse cx="575" cy="650" rx="115" ry="24" fill="#FFFBEB" stroke="#F59E0B" stroke-width="1.8" stroke-dasharray="4,3"/>
+    <text x="575" y="654" text-anchor="middle" fill="#92400E" font-size="11.5" font-weight="600">Broadcast Audio Alert &amp; Siren</text>
+  </g>
+
+  <!-- UC-12: In-Ride Team Chat -->
+  <g id="uc12">
+    <ellipse cx="400" cy="725" rx="105" ry="24" fill="#F8FAFC" stroke="#3B82F6" stroke-width="1.8"/>
+    <text x="400" y="729" text-anchor="middle" fill="#0F172A" font-size="12.5" font-weight="600">In-Ride Instant Chat</text>
+  </g>
+
+  <!-- UC-13: Voice Query POIs (PRIMUS) -->
+  <g id="uc13">
+    <ellipse cx="730" cy="740" rx="115" ry="25" fill="#F0FDF4" stroke="#10B981" stroke-width="2"/>
+    <text x="730" y="744" text-anchor="middle" fill="#065F46" font-size="12" font-weight="700">Voice Query Fuel / Food</text>
+  </g>
+
+  <!-- UC-14: Read Road Hazards Aloud (PRIMUS) -->
+  <g id="uc14">
+    <ellipse cx="730" cy="815" rx="115" ry="25" fill="#F0FDF4" stroke="#10B981" stroke-width="2"/>
+    <text x="730" y="819" text-anchor="middle" fill="#065F46" font-size="12" font-weight="700">Vocalize Hazard Warnings</text>
+  </g>
+
+  <!-- UC-15: View Ride History & Stats -->
+  <g id="uc15">
+    <ellipse cx="400" cy="815" rx="115" ry="24" fill="#F8FAFC" stroke="#3B82F6" stroke-width="1.8"/>
+    <text x="400" y="819" text-anchor="middle" fill="#0F172A" font-size="12" font-weight="600">View Ride History &amp; Stats</text>
+  </g>
+
+  <!-- ================= INCLUDES & EXTENDS RELATIONS ================= -->
+  
+  <!-- UC-03 -> UC-04 (include) -->
+  <path d="M 495 255 L 610 255" fill="none" stroke="#2563EB" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#arrowInclude)"/>
+  <text x="555" y="247" text-anchor="middle" fill="#2563EB" font-size="10.5" font-weight="700">&lt;&lt;include&gt;&gt;</text>
+
+  <!-- UC-07 -> UC-09 (extend) -->
+  <path d="M 505 500 L 635 550" fill="none" stroke="#D97706" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#arrowExtend)"/>
+  <text x="560" y="515" text-anchor="middle" fill="#D97706" font-size="10.5" font-weight="700">&lt;&lt;extend&gt;&gt;</text>
+
+  <!-- UC-10 -> UC-11 (include) -->
+  <path d="M 480 600 L 530 630" fill="none" stroke="#2563EB" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#arrowInclude)"/>
+  <text x="525" y="605" text-anchor="middle" fill="#2563EB" font-size="10.5" font-weight="700">&lt;&lt;include&gt;&gt;</text>
+
+
+  <!-- ================= LEFT ACTORS ================= -->
+
+  <!-- ACTOR 1: Group Leader -->
+  <g id="actorLeader" transform="translate(70, 240)">
+    <!-- Stick Figure -->
+    <circle cx="50" cy="30" r="18" fill="#FFFFFF" stroke="#0F172A" stroke-width="2.5"/>
+    <line x1="50" y1="48" x2="50" y2="105" stroke="#0F172A" stroke-width="2.5"/>
+    <line x1="15" y1="68" x2="85" y2="68" stroke="#0F172A" stroke-width="2.5"/>
+    <line x1="50" y1="105" x2="20" y2="155" stroke="#0F172A" stroke-width="2.5"/>
+    <line x1="50" y1="105" x2="80" y2="155" stroke="#0F172A" stroke-width="2.5"/>
+    <!-- Label -->
+    <text x="50" y="180" text-anchor="middle" fill="#0F172A" font-size="14" font-weight="800">Group Leader</text>
+    <text x="50" y="196" text-anchor="middle" fill="#64748B" font-size="11">(Admin / Road Captain)</text>
+  </g>
+
+  <!-- ACTOR 2: Group Member / Rider -->
+  <g id="actorRider" transform="translate(70, 560)">
+    <!-- Stick Figure -->
+    <circle cx="50" cy="30" r="18" fill="#FFFFFF" stroke="#0F172A" stroke-width="2.5"/>
+    <line x1="50" y1="48" x2="50" y2="105" stroke="#0F172A" stroke-width="2.5"/>
+    <line x1="15" y1="68" x2="85" y2="68" stroke="#0F172A" stroke-width="2.5"/>
+    <line x1="50" y1="105" x2="20" y2="155" stroke="#0F172A" stroke-width="2.5"/>
+    <line x1="50" y1="105" x2="80" y2="155" stroke="#0F172A" stroke-width="2.5"/>
+    <!-- Label -->
+    <text x="50" y="180" text-anchor="middle" fill="#0F172A" font-size="14" font-weight="800">Group Rider</text>
+    <text x="50" y="196" text-anchor="middle" fill="#64748B" font-size="11">(Convoy Member)</text>
+  </g>
+
+  <!-- Generalization: Leader inherits from Rider -->
+  <path d="M 120 380 L 120 540" fill="none" stroke="#475569" stroke-width="2" marker-start="url(#arrow)"/>
+  <text x="135" y="465" fill="#475569" font-size="10.5" font-weight="600">&lt;&lt;inherits&gt;&gt;</text>
+
+
+  <!-- ================= RIGHT ACTORS ================= -->
+
+  <!-- ACTOR 3: Telemetry Server / System -->
+  <g id="actorSystem" transform="translate(980, 460)">
+    <!-- Server Icon / Database -->
+    <rect x="20" y="20" width="70" height="90" rx="8" fill="#F1F5F9" stroke="#0F172A" stroke-width="2.5"/>
+    <line x1="20" y1="50" x2="90" y2="50" stroke="#0F172A" stroke-width="1.5"/>
+    <line x1="20" y1="80" x2="90" y2="80" stroke="#0F172A" stroke-width="1.5"/>
+    <circle cx="35" cy="35" r="4" fill="#2563EB"/>
+    <circle cx="35" cy="65" r="4" fill="#2563EB"/>
+    <circle cx="35" cy="95" r="4" fill="#2563EB"/>
+    <text x="55" y="132" text-anchor="middle" fill="#0F172A" font-size="13.5" font-weight="800">&lt;&lt;System&gt;&gt;</text>
+    <text x="55" y="148" text-anchor="middle" fill="#64748B" font-size="11">Telemetry Engine</text>
+  </g>
+
+  <!-- ACTOR 4: PRIMUS AI Assistant -->
+  <g id="actorPrimus" transform="translate(980, 710)">
+    <!-- AI Bot Icon -->
+    <circle cx="55" cy="40" r="26" fill="#F0FDF4" stroke="#10B981" stroke-width="2.5"/>
+    <circle cx="45" cy="35" r="4" fill="#047857"/>
+    <circle cx="65" cy="35" r="4" fill="#047857"/>
+    <path d="M 45 52 Q 55 60 65 52" fill="none" stroke="#047857" stroke-width="2"/>
+    <line x1="55" y1="14" x2="55" y2="4" stroke="#10B981" stroke-width="2.5"/>
+    <circle cx="55" cy="3" r="3" fill="#10B981"/>
+    <text x="55" y="88" text-anchor="middle" fill="#065F46" font-size="13.5" font-weight="800">PRIMUS AI</text>
+    <text x="55" y="104" text-anchor="middle" fill="#64748B" font-size="11">(Voice Assistant)</text>
+  </g>
+
+
+  <!-- ================= ACTOR ASSOCIATIONS (SOLID LINES) ================= -->
+
+  <!-- Leader Connections -->
+  <line x1="170" y1="280" x2="270" y2="260" stroke="#475569" stroke-width="1.5"/> <!-- To UC-03 Create Group -->
+  <line x1="170" y1="310" x2="290" y2="400" stroke="#475569" stroke-width="1.5"/> <!-- To UC-06 Schedule Ride -->
+
+  <!-- Rider Connections -->
+  <line x1="170" y1="580" x2="295" y2="200" stroke="#475569" stroke-width="1.5"/> <!-- To UC-01 Auth -->
+  <line x1="170" y1="600" x2="280" y2="335" stroke="#475569" stroke-width="1.5"/> <!-- To UC-05 Join Group -->
+  <line x1="170" y1="620" x2="285" y2="480" stroke="#475569" stroke-width="1.5"/> <!-- To UC-07 Stream GPS -->
+  <line x1="170" y1="635" x2="615" y2="495" stroke="#475569" stroke-width="1.5"/> <!-- To UC-08 View Map -->
+  <line x1="170" y1="650" x2="288" y2="580" stroke="#EF4444" stroke-width="1.8"/> <!-- To UC-10 Trigger SOS -->
+  <line x1="170" y1="670" x2="298" y2="720" stroke="#475569" stroke-width="1.5"/> <!-- To UC-12 Chat -->
+  <line x1="170" y1="690" x2="620" y2="745" stroke="#10B981" stroke-width="1.6"/> <!-- To UC-13 Voice Query -->
+  <line x1="170" y1="710" x2="290" y2="815" stroke="#475569" stroke-width="1.5"/> <!-- To UC-15 History -->
+
+  <!-- Telemetry System Connections -->
+  <line x1="980" y1="500" x2="845" y2="565" stroke="#EF4444" stroke-width="1.8"/> <!-- System to UC-09 Straggler Detection -->
+  <line x1="980" y1="520" x2="690" y2="650" stroke="#F59E0B" stroke-width="1.6"/> <!-- System to UC-11 Broadcast Alert -->
+
+  <!-- PRIMUS AI Connections -->
+  <line x1="980" y1="760" x2="845" y2="750" stroke="#10B981" stroke-width="1.8"/> <!-- PRIMUS to UC-13 Voice Query -->
+  <line x1="980" y1="780" x2="845" y2="815" stroke="#10B981" stroke-width="1.8"/> <!-- PRIMUS to UC-14 Read Hazards -->
+
+  <!-- Legend -->
+  <g transform="translate(265, 845)">
+    <rect width="620" height="35" rx="6" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1"/>
+    <text x="15" y="22" font-size="11" font-weight="700" fill="#475569">LEGEND:</text>
+    <line x1="75" y1="18" x2="115" y2="18" stroke="#475569" stroke-width="1.5"/>
+    <text x="122" y="22" font-size="10.5" fill="#334155">Association</text>
+    
+    <line x1="210" y1="18" x2="250" y2="18" stroke="#2563EB" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="257" y="22" font-size="10.5" fill="#2563EB" font-weight="700">&lt;&lt;include&gt;&gt;</text>
+    
+    <line x1="355" y1="18" x2="395" y2="18" stroke="#D97706" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="402" y="22" font-size="10.5" fill="#D97706" font-weight="700">&lt;&lt;extend&gt;&gt;</text>
+
+    <circle cx="510" cy="18" r="6" fill="#FEF2F2" stroke="#EF4444" stroke-width="1.5"/>
+    <text x="522" y="22" font-size="10.5" fill="#991B1B" font-weight="600">Safety Critical UC</text>
+  </g>
+</svg>
