@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getGroupDetails, leaveGroup, regenerateInvite, promoteMember } from '../services/group.service';
 import { getRidesByGroup } from '../services/ride.service';
+import { initSocket, getSocket } from '../services/socket.service';
 import { ApiError } from '../services/api';
 import CreateRideForm from '../components/CreateRideForm.jsx';
 import RideCard from '../components/RideCard.jsx';
@@ -25,6 +26,7 @@ function GroupDetailsPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [showCreateRide, setShowCreateRide] = useState(false);
   const [promotingId, setPromotingId] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
 
   // Pagination
   const [ridePage, setRidePage] = useState(1);
@@ -60,6 +62,106 @@ function GroupDetailsPage() {
   useEffect(() => {
     loadGroup();
   }, [loadGroup]);
+
+  // Real-Time Group Socket Handshake: Auto-update roster when members join/leave without manual refresh
+  useEffect(() => {
+    if (!token || !id) return;
+    const socket = initSocket(token);
+
+    socket.emit('join_group', { groupId: id });
+
+    const handleMemberJoined = (data) => {
+      if (data.groupId && data.groupId.toString() !== id.toString()) return;
+      const newMember = data.member;
+      const memberUser = newMember?.user;
+      const newUserId = (memberUser?._id || memberUser?.id || memberUser)?.toString();
+
+      setGroup((prev) => {
+        if (!prev) return prev;
+        const currentMembers = prev.members || [];
+        const exists = currentMembers.some(
+          (m) => (m.user?._id || m.user?.id || m.user)?.toString() === newUserId
+        );
+        if (exists) return prev;
+        return {
+          ...prev,
+          members: [...currentMembers, newMember],
+        };
+      });
+
+      if (memberUser?.name) {
+        setToastMessage(`🎉 ${memberUser.name} just joined the group!`);
+        setTimeout(() => setToastMessage(null), 6000);
+      }
+
+      loadRides();
+    };
+
+    const handleMemberLeft = (data) => {
+      if (data.groupId && data.groupId.toString() !== id.toString()) return;
+      setGroup((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          members: (prev.members || []).filter(
+            (m) => (m.user?._id || m.user?.id || m.user)?.toString() !== data.userId?.toString()
+          ),
+        };
+      });
+    };
+
+    const handleMemberPromoted = (data) => {
+      if (data.groupId && data.groupId.toString() !== id.toString()) return;
+      setGroup((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          members: (prev.members || []).map((m) => {
+            const mId = (m.user?._id || m.user?.id || m.user)?.toString();
+            if (mId === data.userId?.toString()) {
+              return { ...m, role: data.role || 'admin' };
+            }
+            return m;
+          }),
+        };
+      });
+    };
+
+    const handleRideCreated = () => {
+      loadRides();
+    };
+
+    socket.on('group:member_joined', handleMemberJoined);
+    socket.on('group:member_left', handleMemberLeft);
+    socket.on('group:member_promoted', handleMemberPromoted);
+    socket.on('ride:created', handleRideCreated);
+
+    // Periodic lightweight background sync every 10 seconds to protect against network drops
+    const autoSyncInterval = setInterval(() => {
+      getGroupDetails(id, token)
+        .then((res) => {
+          if (res && res.group) {
+            setGroup((prev) => {
+              if (!prev) return res.group;
+              if (prev.members?.length !== res.group.members?.length) {
+                return { ...prev, members: res.group.members };
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(() => {});
+    }, 10000);
+
+    return () => {
+      clearInterval(autoSyncInterval);
+      socket.emit('leave_group', { groupId: id });
+      socket.off('group:member_joined', handleMemberJoined);
+      socket.off('group:member_left', handleMemberLeft);
+      socket.off('group:member_promoted', handleMemberPromoted);
+      socket.off('ride:created', handleRideCreated);
+    };
+  }, [id, token, loadRides]);
 
   async function handleLeave() {
     if (leaving) return;
@@ -151,6 +253,21 @@ function GroupDetailsPage() {
         {actionError && (
           <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
             {actionError}
+          </div>
+        )}
+
+        {toastMessage && (
+          <div className="mb-4 text-sm font-semibold text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-xl px-4 py-3 flex items-center justify-between shadow-sm animate-pulse">
+            <div className="flex items-center gap-2">
+              <span className="text-base">🚀</span>
+              <span>{toastMessage}</span>
+            </div>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="text-emerald-700 hover:text-emerald-950 text-xs font-bold px-2 py-0.5 rounded bg-emerald-100"
+            >
+              ✕
+            </button>
           </div>
         )}
 

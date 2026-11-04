@@ -1,6 +1,9 @@
 const Group = require('../models/Group');
+const User = require('../models/User');
+const Ride = require('../models/Ride');
 const { validateGroupName, validateInviteCode, isValidObjectId } = require('../validators/group.validators');
 const { generateUniqueInviteCode, newInviteExpiry } = require('../services/invite.service');
+const { getIO } = require('../sockets/ride.socket');
 
 function makeError(message, statusCode, code) {
   const err = new Error(message);
@@ -94,6 +97,74 @@ async function joinGroup(req, res, next) {
 
     group.members.push({ user: req.user.id, role: 'member', joinedAt: new Date() });
     await group.save();
+
+    // Internal Real-Time Event Dispatch: Notify all connected clients without requiring manual page refresh
+    try {
+      const io = getIO();
+      const joinedUser = await User.findById(req.user.id).select(
+        '_id name email phone bloodGroup city state profilePic role emergencyContact'
+      );
+
+      if (io && joinedUser) {
+        const memberPayload = {
+          user: {
+            _id: joinedUser._id,
+            id: joinedUser._id.toString(),
+            name: joinedUser.name,
+            email: joinedUser.email,
+            phone: joinedUser.phone,
+            bloodGroup: joinedUser.bloodGroup,
+            city: joinedUser.city,
+            state: joinedUser.state,
+            profilePic: joinedUser.profilePic,
+            role: 'member',
+          },
+          role: 'member',
+          joinedAt: new Date(),
+        };
+
+        // 1. Dispatch real-time member joined event to Group Details room
+        io.to(`group:${group._id}`).emit('group:member_joined', {
+          groupId: group._id.toString(),
+          member: memberPayload,
+          memberCount: group.members.length,
+        });
+
+        // 2. Automatically enroll newly joined member into active/scheduled rides of this group
+        const activeRides = await Ride.find({
+          group: group._id,
+          status: { $in: ['ongoing', 'scheduled', 'planned'] },
+        });
+
+        for (const r of activeRides) {
+          await Ride.findByIdAndUpdate(r._id, {
+            $addToSet: { participants: req.user.id },
+          });
+
+          // Broadcast to active live ride convoy room so markers & member drawers update instantly
+          io.to(`ride:${r._id}`).emit('rider:joined', {
+            userId: joinedUser._id.toString(),
+            name: joinedUser.name,
+            email: joinedUser.email,
+            phone: joinedUser.phone,
+            bloodGroup: joinedUser.bloodGroup,
+            city: joinedUser.city,
+            state: joinedUser.state,
+            profilePic: joinedUser.profilePic,
+            role: joinedUser.role,
+          });
+
+          io.to(`ride:${r._id}`).emit('group:member_joined', {
+            groupId: group._id.toString(),
+            rideId: r._id.toString(),
+            member: memberPayload,
+            memberCount: group.members.length,
+          });
+        }
+      }
+    } catch (socketErr) {
+      console.warn('[GroupController] Error broadcasting member join:', socketErr);
+    }
 
     res.json({
       success: true,
@@ -218,6 +289,19 @@ async function leaveGroup(req, res, next) {
     group.members = group.members.filter((m) => m.user.toString() !== req.user.id);
     await group.save();
 
+    try {
+      const io = getIO();
+      if (io) {
+        io.to(`group:${id}`).emit('group:member_left', {
+          groupId: id.toString(),
+          userId: req.user.id,
+          memberCount: group.members.length,
+        });
+      }
+    } catch (socketErr) {
+      console.warn('[GroupController] Error broadcasting member leave:', socketErr);
+    }
+
     res.json({ success: true, message: 'You have left the group.' });
   } catch (err) {
     next(err);
@@ -295,6 +379,19 @@ async function promoteMember(req, res, next) {
 
     targetMembership.role = 'admin';
     await group.save();
+
+    try {
+      const io = getIO();
+      if (io) {
+        io.to(`group:${id}`).emit('group:member_promoted', {
+          groupId: id.toString(),
+          userId: userId.toString(),
+          role: 'admin',
+        });
+      }
+    } catch (socketErr) {
+      console.warn('[GroupController] Error broadcasting member promote:', socketErr);
+    }
 
     const members = group.members.map((m) => ({
       user: m.user,

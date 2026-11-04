@@ -113,6 +113,26 @@ async function createRide(req, res, next) {
         createdAt: ride.createdAt,
       },
     });
+
+    try {
+      const io = getIO();
+      if (io) {
+        io.to(`group:${groupId}`).emit('ride:created', {
+          groupId: groupId.toString(),
+          ride: {
+            id: ride._id,
+            title: ride.title,
+            status: ride.status,
+            startLocation: ride.startLocation,
+            destination: ride.destination,
+            distanceKm: ride.distanceKm,
+            createdAt: ride.createdAt,
+          },
+        });
+      }
+    } catch (socketErr) {
+      console.warn('[RideController] Error broadcasting ride:created:', socketErr);
+    }
   } catch (err) {
     next(err);
   }

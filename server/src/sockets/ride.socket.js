@@ -106,10 +106,28 @@ function initSocketServer(httpServer) {
     console.log(`[Socket] Rider connected: ${socket.user.name} (${userId})`);
     socket.join(`user:${userId}`);
 
-    // 1. Join ride room
-    socket.on('join_ride', async ({ rideId }, callback) => {
+    // Group Rooms: Real-time member synchronization without refreshing
+    socket.on('join_group', ({ groupId }) => {
+      if (!groupId) return;
+      socket.join(`group:${groupId}`);
+      console.log(`[Socket] Rider ${socket.user.name} joined group:group:${groupId}`);
+    });
+
+    socket.on('leave_group', ({ groupId }) => {
+      if (!groupId) return;
+      socket.leave(`group:${groupId}`);
+      console.log(`[Socket] Rider ${socket.user.name} left group:group:${groupId}`);
+    });
+
+    // 1. Join ride room & auto-enroll in participants
+    socket.on('join_ride', async ({ rideId, lat, lng, speed, heading, accuracy }, callback) => {
       try {
         if (!rideId) return;
+
+        // Auto-enroll user in ride participants if not already present
+        await Ride.findByIdAndUpdate(rideId, {
+          $addToSet: { participants: socket.user._id },
+        });
 
         const ride = await Ride.findById(rideId)
           .populate('createdBy', 'name email phone bloodGroup profilePic city state role emergencyContact')
@@ -148,10 +166,34 @@ function initSocketServer(httpServer) {
           existingRider.status !== 'OFFLINE' &&
           existingRider.status !== 'LEFT';
 
+        // If coordinates provided at join time, record them immediately
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          const riderLocationData = {
+            userId,
+            name: socket.user.name,
+            email: socket.user.email,
+            phone: socket.user.phone,
+            bloodGroup: socket.user.bloodGroup,
+            city: socket.user.city,
+            state: socket.user.state,
+            profilePic: socket.user.profilePic,
+            role: socket.user.role,
+            lat,
+            lng,
+            accuracy: typeof accuracy === 'number' ? Math.round(accuracy) : null,
+            speed: typeof speed === 'number' ? Math.round(speed) : 0,
+            heading: typeof heading === 'number' ? Math.round(heading) : 0,
+            updatedAt: new Date().toISOString(),
+            status: 'LIVE',
+            lastHeartbeat: Date.now(),
+          };
+          locationsMap.set(userId, riderLocationData);
+        }
+
         const allRiders = Array.from(locationsMap.values());
         const activeRegroup = activeRegroups.get(rideId) || null;
 
-        // Notify others in room with full rider identification details only if truly a new joiner
+        // Notify others in room with full rider identification details and initial location
         const joinPayload = {
           userId,
           name: socket.user.name,
@@ -162,11 +204,29 @@ function initSocketServer(httpServer) {
           state: socket.user.state,
           profilePic: socket.user.profilePic,
           role: socket.user.role,
+          ...(typeof lat === 'number' && typeof lng === 'number' ? {
+            lat,
+            lng,
+            accuracy: typeof accuracy === 'number' ? Math.round(accuracy) : null,
+            speed: typeof speed === 'number' ? Math.round(speed) : 0,
+            heading: typeof heading === 'number' ? Math.round(heading) : 0,
+            status: 'LIVE',
+            updatedAt: new Date().toISOString(),
+          } : {}),
         };
 
         if (!wasAlreadyLive) {
           socket.to(roomName).emit('rider:joined', joinPayload);
         }
+
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          socket.to(roomName).emit('rider:location_update', locationsMap.get(userId));
+        }
+
+        // Real-Time Location Handshake:
+        // Request all active riders in the room to ping their latest coordinates
+        // so the new joiner instantly receives all existing markers without waiting for movement!
+        socket.to(roomName).emit('request:location_ping', { requestedBy: userId });
 
         // Fetch active road hazards for the ride (Stage 10)
         const activeHazards = await Hazard.find({ ride: rideId, resolved: false })
@@ -201,6 +261,12 @@ function initSocketServer(httpServer) {
         console.error('[Socket] join_ride error:', err);
         if (callback) callback({ error: 'Failed to join ride' });
       }
+    });
+
+    // Location Handshake Relay: Riders can request latest pings from everyone
+    socket.on('request:location_ping', ({ rideId }) => {
+      if (!rideId) return;
+      socket.to(`ride:${rideId}`).emit('request:location_ping', { requestedBy: userId });
     });
 
     // 2. Broadcast live GPS location & Detect Overspeeding / Aggressive Riding

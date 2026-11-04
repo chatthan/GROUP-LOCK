@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getMyGroups } from '../services/group.service';
+import { initSocket, getSocket } from '../services/socket.service';
 import { ApiError } from '../services/api';
 import GroupCard from '../components/GroupCard.jsx';
 import CreateGroupForm from '../components/CreateGroupForm.jsx';
@@ -32,6 +33,41 @@ function DashboardPage() {
   useEffect(() => {
     loadGroups();
   }, [loadGroups]);
+
+  // Real-Time Auto-Sync: Listen for group membership changes so member counts stay up-to-date without refreshing
+  useEffect(() => {
+    if (!token) return;
+    const socket = initSocket(token);
+
+    const silentRefresh = () => {
+      getMyGroups(token)
+        .then((res) => {
+          if (res && res.groups) {
+            setGroups(res.groups);
+          }
+        })
+        .catch(() => {});
+    };
+
+    groups.forEach((g) => {
+      if (g.id) socket.emit('join_group', { groupId: g.id });
+    });
+
+    socket.on('group:member_joined', silentRefresh);
+    socket.on('group:member_left', silentRefresh);
+    socket.on('group:member_promoted', silentRefresh);
+    socket.on('ride:created', silentRefresh);
+
+    const interval = setInterval(silentRefresh, 12000);
+
+    return () => {
+      clearInterval(interval);
+      socket.off('group:member_joined', silentRefresh);
+      socket.off('group:member_left', silentRefresh);
+      socket.off('group:member_promoted', silentRefresh);
+      socket.off('ride:created', silentRefresh);
+    };
+  }, [token, groups.length]);
 
   function closePanel() {
     setActivePanel(null);

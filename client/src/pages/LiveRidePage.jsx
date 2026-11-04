@@ -143,6 +143,19 @@ function LiveRidePage() {
   const [currentSpeed, setCurrentSpeed] = useState(0);
   const [gpsStatus, setGpsStatus] = useState('searching'); // 'searching', 'active', 'simulating', 'error'
 
+  // Real-time telemetry refs for zero-latency handshake & auto-syncing
+  const myLocationRef = useRef(myLocation);
+  useEffect(() => {
+    myLocationRef.current = myLocation;
+  }, [myLocation]);
+
+  const currentSpeedRef = useRef(currentSpeed);
+  useEffect(() => {
+    currentSpeedRef.current = currentSpeed;
+  }, [currentSpeed]);
+
+  const currentHeadingRef = useRef(0);
+
   // Notifications banner/toasts
   const [toasts, setToasts] = useState([]);
 
@@ -894,8 +907,19 @@ function LiveRidePage() {
 
     const socket = initSocket(token);
 
-    // Join ride room
-    socket.emit('join_ride', { rideId }, (res) => {
+    // Join ride room with initial coordinates if available
+    const initLoc = myLocationRef.current || lastGoodGpsRef.current;
+    socket.emit(
+      'join_ride',
+      {
+        rideId,
+        lat: initLoc?.lat,
+        lng: initLoc?.lng,
+        accuracy: initLoc?.accuracy,
+        speed: currentSpeedRef.current || 0,
+        heading: currentHeadingRef.current || 0,
+      },
+      (res) => {
       if (res && res.success) {
         setRiders((prev) => {
           const updated = { ...prev };
@@ -1015,6 +1039,94 @@ function LiveRidePage() {
           participants: [...currentParticipants, data],
         };
       });
+
+      // 5. Automatic Handshake: If we have an active GPS position, immediately reply by broadcasting our location
+      // so the newly joined rider instantly sees our pin on their map without needing to refresh!
+      const loc = myLocationRef.current || lastGoodGpsRef.current;
+      if (loc && typeof loc.lat === 'number') {
+        socket.emit('location:update', {
+          rideId,
+          lat: loc.lat,
+          lng: loc.lng,
+          accuracy: loc.accuracy || null,
+          speed: currentSpeedRef.current || 0,
+          heading: currentHeadingRef.current || 0,
+        });
+      }
+    });
+
+    // Real-time: Location Handshake Ping Request
+    socket.on('request:location_ping', () => {
+      const loc = myLocationRef.current || lastGoodGpsRef.current;
+      if (loc && typeof loc.lat === 'number') {
+        socket.emit('location:update', {
+          rideId,
+          lat: loc.lat,
+          lng: loc.lng,
+          accuracy: loc.accuracy || null,
+          speed: currentSpeedRef.current || 0,
+          heading: currentHeadingRef.current || 0,
+        });
+      }
+    });
+
+    // Real-time: Member Joined Group during active ride
+    socket.on('group:member_joined', (data) => {
+      console.log('Realtime Group Member Joined during active ride:', data);
+      if (!data.member || !data.member.user) return;
+      const u = data.member.user;
+      const uId = (u._id || u.id || u).toString();
+
+      setRide((prevRide) => {
+        if (!prevRide) return prevRide;
+        const currentParticipants = prevRide.participants || [];
+        const exists = currentParticipants.some(
+          (p) => (p._id || p.id || p).toString() === uId
+        );
+        if (exists) return prevRide;
+        return {
+          ...prevRide,
+          participants: [...currentParticipants, u],
+        };
+      });
+
+      setRiders((prev) => ({
+        ...prev,
+        [uId]: {
+          ...(prev[uId] || {}),
+          userId: uId,
+          name: u.name || 'Rider',
+          email: u.email,
+          phone: u.phone,
+          bloodGroup: u.bloodGroup,
+          city: u.city,
+          state: u.state,
+          profilePic: u.profilePic,
+          role: u.role || 'member',
+          isActive: true,
+          isOffline: false,
+        },
+      }));
+
+      addToast({
+        type: 'join',
+        title: 'Rider Joined Group Convoy!',
+        message: `${u.name || 'A rider'} joined the group and is now part of this convoy.`,
+        rider: u,
+      });
+
+      // Handshake: Ping back our current coordinates so the new member sees us right away
+      const currentLoc = myLocationRef.current || lastGoodGpsRef.current;
+      if (currentLoc && typeof currentLoc.lat === 'number') {
+        socket.emit('location:update', {
+          rideId,
+          lat: currentLoc.lat,
+          lng: currentLoc.lng,
+          accuracy: currentLoc.accuracy || null,
+          speed: currentSpeedRef.current || 0,
+          heading: currentHeadingRef.current || 0,
+        });
+      }
     });
 
     // Real-time: Rider Left / Disconnected (deduplicated to prevent notification flapping)
@@ -1501,6 +1613,8 @@ function LiveRidePage() {
       socket.emit('leave_ride', { rideId });
       socket.off('rider:location_update');
       socket.off('rider:joined');
+      socket.off('group:member_joined');
+      socket.off('request:location_ping');
       socket.off('rider:left');
       socket.off('rider:disconnected');
       socket.off('ride:started');
@@ -2260,6 +2374,9 @@ function LiveRidePage() {
 
       setMyLocation({ lat, lng, accuracy });
       setCurrentSpeed(roundedSpeed);
+      currentHeadingRef.current = roundedHeading;
+      myLocationRef.current = { lat, lng, accuracy };
+      currentSpeedRef.current = roundedSpeed;
 
       const inDeadZone = !isOnline || simulatedDeadZone;
 
@@ -2343,6 +2460,29 @@ function LiveRidePage() {
     },
     [rideId, user, isOnline, simulatedDeadZone, lowBandwidthMode, queuedPingsCount, syncOfflineQueue]
   );
+
+  // Stage 5/7: Internal Real-Time Auto-Heartbeat & Telemetry Synchronization
+  // Keeps all connected riders' positions fresh and ensures newly joining members
+  // receive accurate GPS pins even if riders are stationary at a traffic light or halt!
+  useEffect(() => {
+    if (!token || !rideId) return;
+    const heartbeatTimer = setInterval(() => {
+      const loc = myLocationRef.current || lastGoodGpsRef.current;
+      const sock = getSocket();
+      if (sock && sock.connected && loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+        sock.emit('location:update', {
+          rideId,
+          lat: loc.lat,
+          lng: loc.lng,
+          accuracy: loc.accuracy || null,
+          speed: currentSpeedRef.current || 0,
+          heading: currentHeadingRef.current || 0,
+        });
+      }
+    }, 5000);
+
+    return () => clearInterval(heartbeatTimer);
+  }, [token, rideId]);
 
   // Real GPS Watcher with continuous satellite tracking and high accuracy
   const lastGoodGpsRef = useRef(null);
